@@ -61,9 +61,13 @@
             synthC.toDestination();
 
             // map sensor data into individual arrays
-            const accelXData = parsedSensorData.data.map(([timestamp,accelX,accelY,accelZ,magX,magY,magZ]) => accelX * 40);
-            const accelYData = parsedSensorData.data.map(([timestamp,accelX,accelY,accelZ,magX,magY,magZ]) => accelY * -15);
-            const accelZData = parsedSensorData.data.map(([timestamp,accelX,accelY,accelZ,magX,magY,magZ]) => accelZ * 200);
+            // todo: getting some values out of range-- for now just gonna Math.abs but really we want to shift the whole register above 0, problem for a less tired me
+            const accelXData = parsedSensorData.data.map(([timestamp,accelX,accelY,accelZ,magX,magY,magZ]) => Math.abs(accelX * 40));
+            const accelYData = parsedSensorData.data.map(([timestamp,accelX,accelY,accelZ,magX,magY,magZ]) => Math.abs(accelY * 15));
+            const accelZData = parsedSensorData.data.map(([timestamp,accelX,accelY,accelZ,magX,magY,magZ]) => Math.abs(accelZ * 200));
+            const magXData = parsedSensorData.data.map(([timestamp,accelX,accelY,accelZ,magX,magY,magZ]) => Math.abs(magX * 1000));
+            const magYData = parsedSensorData.data.map(([timestamp,accelX,accelY,accelZ,magX,magY,magZ]) => Math.abs(magY * 1000));
+            const magZData = parsedSensorData.data.map(([timestamp,accelX,accelY,accelZ,magX,magY,magZ]) => Math.abs(magZ * 100));
 
             // create sequences
             const accelXSeq = new Tone.Sequence((time, note) => {
@@ -78,8 +82,26 @@
 
             const accelZSeq = new Tone.Sequence((time, note) => {
                 console.log(`sequencing note ${note} at time ${time}`);
-                pulse.triggerAttackRelease(note, 0.2, time);
+                synthA.triggerAttackRelease(note, 0.2, time);
             }, accelZData).start(0);
+
+            const magXSeq = new Tone.Sequence((time, note) => {
+                console.log(`sequencing note ${note} at time ${time}`);
+                synthC.triggerAttackRelease(note, 0.2, time);
+            }, magXData).start(0);
+
+            const magYSeq = new Tone.Sequence((time, note) => {
+                console.log(`sequencing note ${note} at time ${time}`);
+                synthB.triggerAttackRelease(note, 0.2, time);
+            }, magYData).start(0);
+
+            const magZSeq = new Tone.Sequence((time, note) => {
+                console.log(`sequencing note ${note} at time ${time}`);
+                synthA.triggerAttackRelease(note, 0.2, time);
+            }, magZData).start(0);
+
+            // todo: create spaces between each individual performance based on timestamp
+            // vary tempo
 
             Tone.Transport.bpm.value = 160;
 
