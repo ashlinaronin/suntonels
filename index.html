@@ -20,14 +20,14 @@
         // alias tune.note for shorter access
         const tn = tune.note.bind(tune);
 
-        let sensorData = [];
+        let parsedSensorData = null;
 
         // parse CSV before starting to play
         Papa.parse("./sensor_data.csv", {
             download: true,
             complete: function (results) {
                 console.log("loaded csv");
-                sensorData = results;
+                parsedSensorData = results;
                 StartAudioContext(Tone.context).then(play);
             }
         })
@@ -39,55 +39,52 @@
             const synthC = new Tone.PolySynth(Tone.Synth);
             const pulse = new Tone.PulseOscillator();
 
-            const pitchLfo = new Tone.LFO(1, tn(3, 2), tn(7, 2)).start();
-
             // fx
-            const distortion = new Tone.Distortion(0.4);
+            const distortion = new Tone.Distortion(0.05);
             const chorus = new Tone.Chorus(4, 2.5, 0.5);
-            const delay = new Tone.Delay(0.1).toDestination();
-
-            // inputs to synths
-            pitchLfo.connect(synthB.frequency);
+            const reverb = new Tone.Reverb();
+            const delay = new Tone.Delay(0.3);
 
             // synths to fx
             synthA.connect(distortion);
             synthB.connect(distortion);
             pulse.connect(delay);
+            synthC.connect(reverb);
 
             // inter-fx connex
             distortion.connect(chorus);
 
             // fx to destination
             delay.toDestination();
+            reverb.toDestination();
             chorus.toDestination();
             synthC.toDestination();
 
-            // sequencing
-            const loopA = new Tone.Loop(time => synthA.triggerAttackRelease(tn(3, 2), "8n", time), "4n").start(0).stop("3m");
-            const loopB = new Tone.Loop(time => synthB.triggerAttackRelease(tn(4, 1), "8n", time), "4n").start("8n").stop("4m");
-            const loopC = new Tone.Loop(time => synthC.triggerAttackRelease(tn(5, 1), "16n", time), "4n").start("16n").stop("2m");
+            // map sensor data into individual arrays
+            const accelXData = parsedSensorData.data.map(([timestamp,accelX,accelY,accelZ,magX,magY,magZ]) => accelX * 40);
+            const accelYData = parsedSensorData.data.map(([timestamp,accelX,accelY,accelZ,magX,magY,magZ]) => accelY * -15);
+            const accelZData = parsedSensorData.data.map(([timestamp,accelX,accelY,accelZ,magX,magY,magZ]) => accelZ * 200);
 
-            Tone.Transport.scheduleRepeat(time => pulse.start(time).stop(time + 0.01), "8n", "8n", "2m");
+            // create sequences
+            const accelXSeq = new Tone.Sequence((time, note) => {
+                console.log(`sequencing note ${note} at time ${time}`);
+                synthC.triggerAttackRelease(note, 0.2, time);
+            }, accelXData).start(0);
 
-            const seq = new Tone.Sequence((time, note) => {
-                synthB.triggerAttackRelease(note, 0.1, time);
-            }, [tn(2), [tn(3), tn(4), tn(5)], tn(7), [tn(6), tn(5)]]);
-            Tone.Transport.scheduleRepeat(time => seq.start(time).stop(time + 0.1), "16n", "4m");
+            const accelYSeq = new Tone.Sequence((time, note) => {
+                console.log(`sequencing note ${note} at time ${time}`);
+                synthB.triggerAttackRelease(note, 0.2, time);
+            }, accelYData).start(0);
 
-            const chordEvent = new Tone.ToneEvent(((time, chord) => {
-                synthC.triggerAttackRelease(chord, 0.5, time);
-            }), [tn(4), tn(6), tn(8)]);
-            chordEvent.start();
-            chordEvent.loop = 4;
-            chordEvent.loopEnd = "1m";
+            const accelZSeq = new Tone.Sequence((time, note) => {
+                console.log(`sequencing note ${note} at time ${time}`);
+                pulse.triggerAttackRelease(note, 0.2, time);
+            }, accelZData).start(0);
 
+            Tone.Transport.bpm.value = 160;
 
             // the loops start when the Transport is started
             Tone.Transport.start();
-
-            // ramp up to 800 bpm over 10 seconds
-            Tone.Transport.bpm.rampTo(800, 10);
-            Tone.Transport.bpm.rampTo(80, 10);
         };
 
     </script>
