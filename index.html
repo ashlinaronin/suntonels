@@ -5,10 +5,10 @@
 </head>
 
 <body>
-
-    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.68/Tone.js"></script>
-    <script type="text/javascript"
-        src="https://cdn.jsdelivr.net/npm/startaudiocontext@1.2.1/StartAudioContext.min.js"></script>
+    <!-- Tone.js 14.7.68 downloaded from CDN for offline work\]=[[[p]]]-->
+    <script type="text/javascript" src="./Tone.js"></script>
+    <!-- startaudiocontet 1.2.1 downloaded from CDN for offline work -->
+    <script type="text/javascript" src="./StartAudioContext.min.js"></script>
     <script type="text/javascript" src="./tune-master/tune.js"></script>
     <script type="text/javascript" src="./PapaParse-5.0.2/papaparse.min.js"></script>
     <script type="module">
@@ -30,7 +30,8 @@
                 parsedSensorData = results;
                 StartAudioContext(Tone.context).then(play);
             }
-        })
+        });
+
 
         const play = async () => {
             // synths
@@ -103,7 +104,7 @@
             // todo: create spaces between each individual performance based on timestamp
             // vary tempo
 
-            Tone.Transport.bpm.value = 160;
+            Tone.Transport.bpm.value = 90;
 
             // the loops start when the Transport is started
             Tone.Transport.start();
