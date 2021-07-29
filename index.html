@@ -34,16 +34,7 @@
 
 
         const play = async () => {
-            // map sensor data into individual arrays
-            // todo: getting some values out of range-- for now just gonna Math.abs but really we want to shift the whole register above 0, problem for a less tired me
-            // const accelXData = parsedSensorData.data.map(([timestamp,accelX,accelY,accelZ,magX,magY,magZ]) => Math.abs(accelX * 40));
-            // const accelYData = parsedSensorData.data.map(([timestamp,accelX,accelY,accelZ,magX,magY,magZ]) => Math.abs(accelY * 15));
-            // const accelZData = parsedSensorData.data.map(([timestamp,accelX,accelY,accelZ,magX,magY,magZ]) => Math.abs(accelZ * 200));
-            // const magXData = parsedSensorData.data.map(([timestamp,accelX,accelY,accelZ,magX,magY,magZ]) => Math.abs(magX * 1000));
-            // const magYData = parsedSensorData.data.map(([timestamp,accelX,accelY,accelZ,magX,magY,magZ]) => Math.abs(magY * 1000));
-            // const magZData = parsedSensorData.data.map(([timestamp,accelX,accelY,accelZ,magX,magY,magZ]) => Math.abs(magZ * 100));
-
-            // todo: try to get some kind of data structure that represents teh rate of change
+            // todo: try to get some kind of data structure that represents the rate of change
             // ironic that we want rate of change in acceleration since it is a rate of change lol
             // but hoping this will help us derive some kind of more interesting rhythm
             const accelDiffs = parsedSensorData.data.map(([timestamp,accelX,accelY,accelZ,magX,magY,magZ], index) => {
@@ -56,8 +47,17 @@
                 return 0;
             });
 
-            const accelChordFreqMult = 20;
+            const magnetDiffs = parsedSensorData.data.map(([timestamp,accelX,accelY,accelZ,magX,magY,magZ], index) => {
+                const nextItem = parsedSensorData.data[index + 1];
+                if (typeof nextItem !== "undefined") {
+                    const [, , , , nextMagX] = nextItem;
+                    return parseFloat(nextMagX) - parseFloat(magX);
+                }
 
+                return 0;
+            });
+
+            const accelChordFreqMult = 45;
             const accelChords = parsedSensorData.data.map(([timestamp,accelX,accelY,accelZ,magX,magY,magZ], index) => {
                 return [
                     Math.abs(accelX) * accelChordFreqMult,
@@ -66,39 +66,71 @@
                 ];
             });
 
+            const magnetChordFreqMult = 120;
+            const magnetChords = parsedSensorData.data.map(([timestamp,accelX,accelY,accelZ,magX,magY,magZ], index) => {
+                return [
+                    Math.abs(magX) * magnetChordFreqMult,
+                    Math.abs(magY) * magnetChordFreqMult,
+                    Math.abs(magZ) * magnetChordFreqMult
+                ];
+            });
+
 
             // looks like [0, 0.15, -0.3, 0, 0.3, -0.15, 0, 0, -0.15, 0, 0.15, ...]
 
-            const keys = new Tone.PolySynth(Tone.Synth, {
+            const accelPolySynth = new Tone.PolySynth(Tone.Synth, {
                 volume: -8,
                 oscillator: {
                     partials: [1, 2, 1],
                 },
             }).toDestination();
 
-            const cChord = ["C4", "E4", "G4", "B4"];
-            const dChord = ["D4", "F4", "A4", "C5"];
-            const gChord = ["B3", "D4", "E4", "A4"];
+            const magPolySynth = new Tone.PolySynth(Tone.MetalSynth, {
+                volume: -8,
+                // oscillator: {
+                //     partials: [1, 2, 1]
+                // }
+            }).toDestination();
 
 
+            const accelRhythmMult = 1.4;
+            // they go up each time like [0, 0.3, 1.3, 1.6] etc even when there were some negative values
             const accelDiffsSummed = accelDiffs.reduce((accumulator, value, index) => {
                 // todo: this could be written more nicely but w/e
                 if (index === 0) return accumulator;
                 if (index === 1) return [...accumulator, Math.abs(value)];
 
-                return [...accumulator, accumulator[accumulator.length-1] + Math.abs(value)]; 
+                return [
+                    ...accumulator,
+                    accumulator[accumulator.length-1] + (accelRhythmMult * Math.abs(value))
+                ]; 
             }, []);
-
-            // const justFirstDiffs = accelDiffsSummed.slice(0, 120);
             const accelDiffsChords = accelDiffsSummed.map((diff, index) => [diff, accelChords[index]]);
-            const diffPianoPart = new Tone.Part(((time, chord) => {
-                keys.triggerAttackRelease(chord, "8n", time);
+                      
+            const accelPart = new Tone.Part(((time, chord) => {
+                accelPolySynth.triggerAttackRelease(chord, "16n", time);
             }), accelDiffsChords).start(0);
+            accelPart.humanize = true;
 
+            const magRhythmMult = 100;
+            // they go up each time like [0, 0.3, 1.3, 1.6] etc even when there were some negative values
+            const magDiffsSummed = magnetDiffs.reduce((accumulator, value, index) => {
+                // todo: this could be written more nicely but w/e
+                if (index === 0) return accumulator;
+                if (index === 1) return [...accumulator, Math.abs(value)];
 
-            diffPianoPart.loop = true;
-            diffPianoPart.loopEnd = "1m";
-            diffPianoPart.humanize = true;
+                return [
+                    ...accumulator,
+                    accumulator[accumulator.length-1] + (magRhythmMult * Math.abs(value))
+                ]; 
+            }, []);
+            const magDiffsChords = magDiffsSummed.map((diff, index) => [diff, magnetChords[index]]);
+                  
+
+            const magPart = new Tone.Part(((time, chord) => {
+                magPolySynth.triggerAttackRelease(chord, "16n", time);
+            }), magDiffsChords).start(0);
+            magPart.humanize = true;
 
 
             Tone.Transport.bpm.value = 90;
