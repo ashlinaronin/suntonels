@@ -34,75 +34,72 @@
 
 
         const play = async () => {
-            // synths
-            const synthA = new Tone.FMSynth();
-            const synthB = new Tone.AMSynth();
-            const synthC = new Tone.PolySynth(Tone.Synth);
-            const pulse = new Tone.PulseOscillator();
-
-            // fx
-            const distortion = new Tone.Distortion(0.05);
-            const chorus = new Tone.Chorus(4, 2.5, 0.5);
-            const reverb = new Tone.Reverb();
-            const delay = new Tone.Delay(0.3);
-
-            // synths to fx
-            synthA.connect(distortion);
-            synthB.connect(distortion);
-            pulse.connect(delay);
-            synthC.connect(reverb);
-
-            // inter-fx connex
-            distortion.connect(chorus);
-
-            // fx to destination
-            delay.toDestination();
-            reverb.toDestination();
-            chorus.toDestination();
-            synthC.toDestination();
-
             // map sensor data into individual arrays
             // todo: getting some values out of range-- for now just gonna Math.abs but really we want to shift the whole register above 0, problem for a less tired me
-            const accelXData = parsedSensorData.data.map(([timestamp,accelX,accelY,accelZ,magX,magY,magZ]) => Math.abs(accelX * 40));
-            const accelYData = parsedSensorData.data.map(([timestamp,accelX,accelY,accelZ,magX,magY,magZ]) => Math.abs(accelY * 15));
-            const accelZData = parsedSensorData.data.map(([timestamp,accelX,accelY,accelZ,magX,magY,magZ]) => Math.abs(accelZ * 200));
-            const magXData = parsedSensorData.data.map(([timestamp,accelX,accelY,accelZ,magX,magY,magZ]) => Math.abs(magX * 1000));
-            const magYData = parsedSensorData.data.map(([timestamp,accelX,accelY,accelZ,magX,magY,magZ]) => Math.abs(magY * 1000));
-            const magZData = parsedSensorData.data.map(([timestamp,accelX,accelY,accelZ,magX,magY,magZ]) => Math.abs(magZ * 100));
+            // const accelXData = parsedSensorData.data.map(([timestamp,accelX,accelY,accelZ,magX,magY,magZ]) => Math.abs(accelX * 40));
+            // const accelYData = parsedSensorData.data.map(([timestamp,accelX,accelY,accelZ,magX,magY,magZ]) => Math.abs(accelY * 15));
+            // const accelZData = parsedSensorData.data.map(([timestamp,accelX,accelY,accelZ,magX,magY,magZ]) => Math.abs(accelZ * 200));
+            // const magXData = parsedSensorData.data.map(([timestamp,accelX,accelY,accelZ,magX,magY,magZ]) => Math.abs(magX * 1000));
+            // const magYData = parsedSensorData.data.map(([timestamp,accelX,accelY,accelZ,magX,magY,magZ]) => Math.abs(magY * 1000));
+            // const magZData = parsedSensorData.data.map(([timestamp,accelX,accelY,accelZ,magX,magY,magZ]) => Math.abs(magZ * 100));
 
-            // create sequences
-            const accelXSeq = new Tone.Sequence((time, note) => {
-                console.log(`sequencing note ${note} at time ${time}`);
-                synthC.triggerAttackRelease(note, 0.2, time);
-            }, accelXData).start(0);
+            // todo: try to get some kind of data structure that represents teh rate of change
+            // ironic that we want rate of change in acceleration since it is a rate of change lol
+            // but hoping this will help us derive some kind of more interesting rhythm
+            const accelDiffs = parsedSensorData.data.map(([timestamp,accelX,accelY,accelZ,magX,magY,magZ], index) => {
+                const nextItem = parsedSensorData.data[index + 1];
+                if (typeof nextItem !== "undefined") {
+                    const [, nextAccelX] = nextItem;
+                    return parseFloat(nextAccelX) - parseFloat(accelX);
+                }
 
-            const accelYSeq = new Tone.Sequence((time, note) => {
-                console.log(`sequencing note ${note} at time ${time}`);
-                synthB.triggerAttackRelease(note, 0.2, time);
-            }, accelYData).start(0);
+                return 0;
+            });
 
-            const accelZSeq = new Tone.Sequence((time, note) => {
-                console.log(`sequencing note ${note} at time ${time}`);
-                synthA.triggerAttackRelease(note, 0.2, time);
-            }, accelZData).start(0);
+            const accelChordFreqMult = 20;
 
-            const magXSeq = new Tone.Sequence((time, note) => {
-                console.log(`sequencing note ${note} at time ${time}`);
-                synthC.triggerAttackRelease(note, 0.2, time);
-            }, magXData).start(0);
+            const accelChords = parsedSensorData.data.map(([timestamp,accelX,accelY,accelZ,magX,magY,magZ], index) => {
+                return [
+                    Math.abs(accelX) * accelChordFreqMult,
+                    Math.abs(accelY) * accelChordFreqMult,
+                    Math.abs(accelZ) * accelChordFreqMult
+                ];
+            });
 
-            const magYSeq = new Tone.Sequence((time, note) => {
-                console.log(`sequencing note ${note} at time ${time}`);
-                synthB.triggerAttackRelease(note, 0.2, time);
-            }, magYData).start(0);
 
-            const magZSeq = new Tone.Sequence((time, note) => {
-                console.log(`sequencing note ${note} at time ${time}`);
-                synthA.triggerAttackRelease(note, 0.2, time);
-            }, magZData).start(0);
+            // looks like [0, 0.15, -0.3, 0, 0.3, -0.15, 0, 0, -0.15, 0, 0.15, ...]
 
-            // todo: create spaces between each individual performance based on timestamp
-            // vary tempo
+            const keys = new Tone.PolySynth(Tone.Synth, {
+                volume: -8,
+                oscillator: {
+                    partials: [1, 2, 1],
+                },
+            }).toDestination();
+
+            const cChord = ["C4", "E4", "G4", "B4"];
+            const dChord = ["D4", "F4", "A4", "C5"];
+            const gChord = ["B3", "D4", "E4", "A4"];
+
+
+            const accelDiffsSummed = accelDiffs.reduce((accumulator, value, index) => {
+                // todo: this could be written more nicely but w/e
+                if (index === 0) return accumulator;
+                if (index === 1) return [...accumulator, Math.abs(value)];
+
+                return [...accumulator, accumulator[accumulator.length-1] + Math.abs(value)]; 
+            }, []);
+
+            // const justFirstDiffs = accelDiffsSummed.slice(0, 120);
+            const accelDiffsChords = accelDiffsSummed.map((diff, index) => [diff, accelChords[index]]);
+            const diffPianoPart = new Tone.Part(((time, chord) => {
+                keys.triggerAttackRelease(chord, "8n", time);
+            }), accelDiffsChords).start(0);
+
+
+            diffPianoPart.loop = true;
+            diffPianoPart.loopEnd = "1m";
+            diffPianoPart.humanize = true;
+
 
             Tone.Transport.bpm.value = 90;
 
